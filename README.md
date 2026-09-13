@@ -119,7 +119,32 @@ Click the **Settings & SMTP** button in the header of the web page to open the c
 * **New Server Profile:** Create a cloned baseline profile, input its distinct Frigate and MQTT coordinates, and save it under a unique name (e.g. "Cottage Server").
 * **Delete Profile:** Safely remove older or inactive profiles with automatic safe fallback routing.
 
-### 2. Gmail SMTP Setup
+### 2. Live Streaming Mode & Audio (WebRTC)
+
+Under **Detection & Streams** in Settings, the **Streaming Protocol Mode** dropdown defaults to MJPEG (video only, no audio, but "100% Reliable"). Switching it to **WebRTC Direct** streams via Frigate's embedded go2rtc instead, which is the only mode with real audio — but it usually needs one small addition to Frigate's own `config.yml` first:
+
+```yaml
+go2rtc:
+  streams:
+    ...(your existing camera entries)...
+  webrtc:
+    candidates:
+      - YOUR_FRIGATE_HOST_IP:8555
+```
+
+Add `webrtc:` as a **sibling of your existing `go2rtc.streams` key** — not a second top-level `go2rtc:` block elsewhere in the file. YAML doesn't merge duplicate top-level keys; the last one silently wins, which would wipe out every camera restream you've already defined under `streams:`. Restart Frigate after saving. If you view this instance from more than one network (e.g. locally and over Tailscale/VPN), list a candidate for each — go2rtc will use whichever one the viewer can actually reach:
+
+```yaml
+    candidates:
+      - 192.168.1.50:8555
+      - 100.x.x.x:8555
+```
+
+**Why this is needed:** without it, go2rtc has to guess its own reachable address for WebRTC's ICE negotiation, which frequently fails on a Docker host with more than one network interface — the connection succeeds, but no media ever actually reaches the browser. This is a Frigate/go2rtc configuration detail, not something this app can work around in code.
+
+**If you get audio but no video:** that's a separate, unrelated issue — most browsers' WebRTC stack can negotiate H.265 but never actually decode it, so a camera whose stream happens to be H.265 will play audio while video silently never renders. This app already works around it automatically by preferring an H.264 stream when one of the camera's configured ffmpeg inputs offers it — if a camera only has an H.265 source available at all, there's currently no fix short of changing that camera's stream encoding.
+
+### 3. Gmail SMTP Setup
 To send alerts via `smtp.gmail.com` with direct camera snapshots attached:
 1. Go to your [Google Account Settings](https://myaccount.google.com/).
 2. Enable **2-Step Verification**.
@@ -129,5 +154,5 @@ To send alerts via `smtp.gmail.com` with direct camera snapshots attached:
 6. Paste this app password into the **Gmail App Password** field in the Settings panel (without spaces).
 7. Toggle the **Enable email alerts** checkbox on or off as needed, and click **Save**.
 
-### 3. Tracked Classes
+### 4. Tracked Classes
 Check the checkboxes for any objects you want to alert on (such as `person`, `car`, `cat`, `dog`, `bear`, `bird`). Only classes ticked here will trigger logs and alerts.
