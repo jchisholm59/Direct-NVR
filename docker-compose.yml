@@ -1,0 +1,25 @@
+services:
+  direct-nvr:
+    build: .
+    container_name: direct-nvr
+    restart: unless-stopped
+    ports:
+      - "3010:3010"
+    env_file:
+      - .env
+    volumes:
+      # Runtime state — bind-mounted so it persists across container
+      # rebuilds/recreates instead of resetting every time. Each file must
+      # already exist on the host or Docker will create it as a directory
+      # instead of a file; `touch` any that are missing before first run.
+      - ./settings.json:/app/settings.json
+      - ./alerts_history.json:/app/alerts_history.json
+      - ./rois.json:/app/rois.json
+      - ./exclusions.json:/app/exclusions.json
+      - ./detections_state.json:/app/detections_state.json
+      - ./public/clips:/app/public/clips
+    # Frigate/MQTT live on your LAN (e.g. 192.168.2.210), not on this
+    # container's own host — the default bridge network reaches that fine.
+    # If MQTT auto-discovery can't find your broker, try uncommenting this
+    # (Linux hosts only — Docker Desktop on Mac/Windows doesn't support it):
+    # network_mode: host

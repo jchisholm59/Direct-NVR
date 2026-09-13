@@ -74,6 +74,26 @@ Common day-to-day commands: `pm2 status`, `pm2 logs direct-nvr`,
 `pm2 restart direct-nvr`, `pm2 stop direct-nvr`. Full details in
 [SERVER_SETUP_PM2.md](SERVER_SETUP_PM2.md).
 
+### 4. Running It Under Docker
+
+```bash
+cp .env.example .env   # fill in your GEMINI_API_KEY / PORT
+./docker-setup.sh      # one-time: creates the state files Docker needs to exist first
+docker compose up -d --build
+```
+
+`docker-setup.sh` matters — `docker-compose.yml` bind-mounts `settings.json`,
+`alerts_history.json`, `rois.json`, `exclusions.json`, and
+`detections_state.json` individually so your settings/zones/history survive
+a rebuild. If one of those doesn't already exist on the host *before* you
+run `docker compose up`, Docker creates it as an empty **directory** instead
+of a file, which silently breaks the app (this is standard Docker
+bind-mount behavior, not a bug in this project) — the setup script just
+makes sure they all exist first. Re-run it any time after a fresh clone.
+
+Logs: `docker compose logs -f`. Stop: `docker compose down` (data isn't
+deleted — it's on the host, not in the container).
+
 ---
 
 ## 📐 Dynamic Frigate Integration (MQTT & API)
