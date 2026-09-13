@@ -44,10 +44,35 @@ To stop the server easily at any time, run:
 npm stop
 ```
 
-`npm start` runs in the foreground and stops when you close the terminal or
-log out — fine for testing, not for a server you want running 24/7. For
-that, see [SERVER_SETUP_PM2.md](SERVER_SETUP_PM2.md) to run it persistently
-under [pm2](https://pm2.keymetrics.io/), including surviving a reboot.
+### 3. Running It 24/7 with pm2
+
+`npm start` runs in the foreground and stops as soon as you close the
+terminal or log out — fine for testing, not for a server you actually rely
+on. To keep it running in the background instead:
+
+```bash
+npm install -g pm2
+pm2 start server.js --name direct-nvr
+```
+
+That keeps it running after you close the terminal, but **not** after a
+reboot — pm2 itself has to be told to come back on boot, which takes two
+more one-time commands:
+
+```bash
+pm2 startup
+```
+This prints an OS-specific command (starting with something like
+`sudo env PATH=...`) — copy that exact line and run it. Then:
+```bash
+pm2 save
+```
+which snapshots the current process list so pm2 knows what to restore.
+Re-run `pm2 save` any time you add, remove, or rename a pm2 process later.
+
+Common day-to-day commands: `pm2 status`, `pm2 logs direct-nvr`,
+`pm2 restart direct-nvr`, `pm2 stop direct-nvr`. Full details in
+[SERVER_SETUP_PM2.md](SERVER_SETUP_PM2.md).
 
 ---
 
