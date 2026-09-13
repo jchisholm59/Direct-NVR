@@ -6,7 +6,7 @@ Welcome to your mobile-enabled Direct NVR project! This guide is written specifi
 
 ## 🚀 Part 1: How to Upload Your Code to GitHub (For Beginners)
 
-Since your local files have been modified and committed locally, we need to push them to your online GitHub repository (`your-github-username/direct-nvr-viewer`).
+Since your local files have been modified and committed locally, we need to push them to your online GitHub repository (`your-github-username/Direct-NVR`).
 
 Because GitHub no longer accepts normal account passwords for security, you must authenticate. Here are the two easiest ways to push your changes:
 
@@ -16,7 +16,7 @@ If you have a working Personal Access Token (PAT) with **Repo / Write** access, 
 1. Open your Mac **Terminal** app.
 2. Navigate to your project folder:
    ```bash
-   cd /path/to/your/direct-nvr-viewer
+   cd /path/to/your/Direct-NVR
    ```
 3. Run the push command:
    ```bash
@@ -30,7 +30,7 @@ If you prefer a visual interface, you can use the official free **GitHub Desktop
 1. Download and install [GitHub Desktop](https://desktop.github.com/).
 2. Open GitHub Desktop and log in with your GitHub credentials.
 3. Click on **File** (in the top menu bar) -> **Add Local Repository...**
-4. Browse to and select: `/path/to/your/direct-nvr-viewer`
+4. Browse to and select: `/path/to/your/Direct-NVR`
 5. GitHub Desktop will instantly recognize your repository and show that your local branch is ahead of the online branch.
 6. Click the **"Publish branch"** or **"Push origin"** button at the top right to safely upload everything to GitHub!
 
@@ -44,7 +44,7 @@ Your mobile app is built using **Capacitor**, which wraps your high-performance 
 The mobile apps are client-side "players." They need your Node backend server to be running on your home network to function.
 On your Mac/Server, start the backend:
 ```bash
-cd /path/to/your/direct-nvr-viewer
+cd /path/to/your/Direct-NVR
 npm start
 ```
 *(Take note of your server's IP address on your local network, e.g., `http://192.168.1.100:3010`, or your Tailscale IP).*

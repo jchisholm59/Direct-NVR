@@ -31,7 +31,7 @@ A lightweight, ultra-high-performance web application designed to run seamlessly
 Navigate to the directory and run:
 
 ```bash
-cd /path/to/your/direct-nvr-viewer
+cd /path/to/your/Direct-NVR
 npm install
 npm start
 ```

@@ -1,5 +1,5 @@
 {
-  "name": "direct-nvr-viewer",
+  "name": "direct-nvr",
   "version": "1.0.0",
   "description": "Custom NVR viewer and real-time AI alerting engine",
   "main": "server.js",
