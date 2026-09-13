@@ -301,6 +301,52 @@ async function discoverFrigateIP() {
   return 'localhost';
 }
 
+// Fetches go2rtc's live per-stream codec/media info (via Frigate's proxy of
+// its embedded go2rtc instance). Used to pick a WebRTC-safe stream per
+// camera — see pickBestGo2rtcStreamName() for why this matters.
+async function fetchGo2rtcStreamsInfo(frigateIP) {
+  try {
+    const resp = await fetch(`http://${frigateIP}:5000/api/go2rtc/streams`, { signal: AbortSignal.timeout(5000) });
+    if (!resp.ok) return {};
+    return await resp.json();
+  } catch (err) {
+    console.warn('[go2rtc] Could not fetch stream codec info:', err.message);
+    return {};
+  }
+}
+
+// Picks the best go2rtc stream name for live WebRTC playback out of a
+// camera's candidate streams (one per ffmpeg input). Naively taking
+// whichever input is last, or whichever Frigate's YAML happens to tag with
+// the 'audio' role, doesn't work: most browsers' WebRTC stack can
+// negotiate H.265 but then never actually decode it — the connection
+// succeeds, audio plays, video just silently never renders a frame. Some
+// cameras' "record"/audio-tagged stream is H.265 while their other stream
+// is H.264 and, per go2rtc's own live info, carries audio too despite not
+// being role-tagged for it. So instead of trusting Frigate's static tags,
+// this scores each candidate by its *actual* negotiated codec/audio
+// presence and picks the best: H.264 (or other WebRTC-safe codec) with
+// audio > H.264 without audio > has audio but is H.265 > whatever's first.
+function pickBestGo2rtcStreamName(candidateNames, go2rtcStreamsInfo) {
+  if (!candidateNames || candidateNames.length === 0) return null;
+  if (!go2rtcStreamsInfo || Object.keys(go2rtcStreamsInfo).length === 0) {
+    return candidateNames[candidateNames.length - 1]; // old behavior as a fallback
+  }
+  let best = null;
+  let bestScore = -1;
+  for (const name of candidateNames) {
+    const medias = (go2rtcStreamsInfo[name] && go2rtcStreamsInfo[name].producers && go2rtcStreamsInfo[name].producers[0] && go2rtcStreamsInfo[name].producers[0].medias) || [];
+    const hasAudio = medias.some((m) => m.startsWith('audio'));
+    const isHevc = medias.some((m) => m.startsWith('video') && /H\.?265|HEVC/i.test(m));
+    const score = (isHevc ? 0 : 2) + (hasAudio ? 1 : 0);
+    if (score > bestScore) {
+      bestScore = score;
+      best = name;
+    }
+  }
+  return best || candidateNames[candidateNames.length - 1];
+}
+
 // Helper to parse Frigate configuration and resolve camera direct RTSP streams
 function parseFrigateConfig() {
   if (!fs.existsSync(FRIGATE_CONFIG_PATH)) {
@@ -331,35 +377,36 @@ function parseFrigateConfig() {
 
     const go2rtcStreams = (doc.go2rtc && doc.go2rtc.streams) || {};
     const parsedCameras = {};
+    const candidatesByCam = {};
+    const frigateIP = settings.go2rtcHost || 'localhost';
 
     for (const [camName, camConfig] of Object.entries(doc.cameras)) {
       if (camConfig.enabled === false) continue;
 
-      let go2rtcStreamName = null;
-      let rtspUrl = null;
-
-      // Find stream name used for 'detect' or 'record' role
+      // Every ffmpeg input's go2rtc stream name is a candidate — which one
+      // is actually best (WebRTC-safe codec + has audio) can only be
+      // determined by asking go2rtc directly, done async below since this
+      // function itself needs to stay synchronous for its callers.
+      const candidateNames = [];
       if (camConfig.ffmpeg && camConfig.ffmpeg.inputs) {
         for (const input of camConfig.ffmpeg.inputs) {
           if (input.path) {
             // Path might be e.g. rtsp://127.0.0.1:8554/driveway_2
             const urlParts = input.path.split('/');
             const lastPart = urlParts[urlParts.length - 1];
-            if (lastPart) {
-              go2rtcStreamName = lastPart;
-            }
+            if (lastPart) candidateNames.push(lastPart);
           }
         }
       }
+      candidatesByCam[camName] = candidateNames;
 
-      // If no stream name found, default to camera name
-      if (!go2rtcStreamName) {
-        go2rtcStreamName = `${camName}_1`;
-      }
+      // Synchronous best-effort pick (old "last input" behavior) so
+      // cameras work immediately; refineGo2rtcStreamSelection may upgrade
+      // this moments later once it hears back from go2rtc.
+      const go2rtcStreamName = candidateNames[candidateNames.length - 1] || `${camName}_1`;
 
       // Resolve RTSP URL to the go2rtc restream port 8554 instead of accessing cameras directly
-      const frigateIP = settings.go2rtcHost || 'localhost';
-      rtspUrl = `rtsp://${frigateIP}:8554/${go2rtcStreamName}`;
+      const rtspUrl = `rtsp://${frigateIP}:8554/${go2rtcStreamName}`;
 
       const width = (camConfig.detect && camConfig.detect.width) || 1280;
       const height = (camConfig.detect && camConfig.detect.height) || 720;
@@ -377,16 +424,42 @@ function parseFrigateConfig() {
 
     cameras = parsedCameras;
     console.log('Successfully loaded cameras from Frigate config:', Object.keys(cameras));
+    refineGo2rtcStreamSelection(frigateIP, candidatesByCam);
   } catch (err) {
     console.error('Failed to parse Frigate config:', err);
   }
+}
+
+// Fire-and-forget upgrade pass: once go2rtc's real codec/audio info comes
+// back, re-pick each camera's go2rtcStreamName using it instead of the
+// synchronous "last input" guess, and push the change to connected clients.
+async function refineGo2rtcStreamSelection(frigateIP, candidatesByCam) {
+  const streamsInfo = await fetchGo2rtcStreamsInfo(frigateIP);
+  if (Object.keys(streamsInfo).length === 0) return;
+
+  let changed = false;
+  for (const [camName, candidateNames] of Object.entries(candidatesByCam)) {
+    const cam = cameras[camName];
+    if (!cam) continue;
+    const best = pickBestGo2rtcStreamName(candidateNames, streamsInfo);
+    if (best && best !== cam.go2rtcStreamName) {
+      console.log(`[go2rtc] ${camName}: switching WebRTC stream ${cam.go2rtcStreamName} -> ${best} (better codec/audio match)`);
+      cam.go2rtcStreamName = best;
+      cam.rtspUrl = `rtsp://${frigateIP}:8554/${best}`;
+      changed = true;
+    }
+  }
+  if (changed) io.emit('config-updated', { cameras });
 }
 
 // Dynamically fetch and parse active configuration from a remote Frigate server by IP address
 async function loadDynamicConfig(frigateIP) {
   console.log(`[DYNAMIC] Fetching config from remote Frigate instance at http://${frigateIP}:5000/api/config...`);
   try {
-    const response = await fetch(`http://${frigateIP}:5000/api/config`, { signal: AbortSignal.timeout(10000) });
+    const [response, go2rtcStreamsInfo] = await Promise.all([
+      fetch(`http://${frigateIP}:5000/api/config`, { signal: AbortSignal.timeout(10000) }),
+      fetchGo2rtcStreamsInfo(frigateIP),
+    ]);
     if (!response.ok) {
       throw new Error(`Frigate returned status ${response.status}: ${response.statusText}`);
     }
@@ -414,22 +487,20 @@ async function loadDynamicConfig(frigateIP) {
     for (const [camName, camConfig] of Object.entries(doc.cameras)) {
       if (camConfig.enabled === false) continue;
 
-      let go2rtcStreamName = null;
+      // Every ffmpeg input's go2rtc stream name is a candidate — see
+      // pickBestGo2rtcStreamName() for why we don't just take the last one.
+      const candidateNames = [];
       if (camConfig.ffmpeg && camConfig.ffmpeg.inputs) {
         for (const input of camConfig.ffmpeg.inputs) {
           if (input.path) {
             const urlParts = input.path.split('/');
             const lastPart = urlParts[urlParts.length - 1];
-            if (lastPart) {
-              go2rtcStreamName = lastPart;
-            }
+            if (lastPart) candidateNames.push(lastPart);
           }
         }
       }
 
-      if (!go2rtcStreamName) {
-        go2rtcStreamName = `${camName}_1`;
-      }
+      const go2rtcStreamName = pickBestGo2rtcStreamName(candidateNames, go2rtcStreamsInfo) || `${camName}_1`;
 
       // Automatically construct the RTSP URL using the specified Frigate IP and Port 8554 restream
       const rtspUrl = `rtsp://${frigateIP}:8554/${go2rtcStreamName}`;
