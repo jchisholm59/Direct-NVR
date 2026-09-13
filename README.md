@@ -44,6 +44,11 @@ To stop the server easily at any time, run:
 npm stop
 ```
 
+`npm start` runs in the foreground and stops when you close the terminal or
+log out — fine for testing, not for a server you want running 24/7. For
+that, see [SERVER_SETUP_PM2.md](SERVER_SETUP_PM2.md) to run it persistently
+under [pm2](https://pm2.keymetrics.io/), including surviving a reboot.
+
 ---
 
 ## 📐 Dynamic Frigate Integration (MQTT & API)
