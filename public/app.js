@@ -590,10 +590,32 @@ function drawCanvasContent(cameraName, canvas, cursorCoords = null) {
 
 // Lightbox Expand Stream Zoom State Manager
 let zoomedCamera = null;
+// Real audio only exists over WebRTC (MJPEG has no audio channel at all),
+// so this only ever applies in that mode. Starts muted — same reasoning
+// as a browser tab that shouldn't blast audio the instant you open a
+// camera — the toggle button lets you turn it on deliberately.
+let zoomMuted = true;
 const zoomModal = document.getElementById('zoom-modal');
 const zoomTitle = document.getElementById('zoom-title');
 const zoomContainer = document.getElementById('zoom-container');
 const closeZoomBtn = document.getElementById('close-zoom-btn');
+const zoomMuteBtn = document.getElementById('zoom-mute-btn');
+
+function updateZoomMuteButton() {
+  const icon = zoomMuteBtn.querySelector('i');
+  const label = zoomMuteBtn.querySelector('span');
+  icon.className = zoomMuted ? 'fa-solid fa-volume-xmark' : 'fa-solid fa-volume-high';
+  label.textContent = zoomMuted ? 'Muted' : 'Audio On';
+}
+
+function toggleZoomMute() {
+  zoomMuted = !zoomMuted;
+  const player = document.getElementById('zoom-player');
+  if (player && player.tagName === 'VIDEO') player.muted = zoomMuted;
+  updateZoomMuteButton();
+}
+
+zoomMuteBtn.addEventListener('click', toggleZoomMute);
 
 function zoomCamera(cameraName) {
   if (drawingCamera) return; // Prevent zooming while editing scan windows
@@ -615,10 +637,14 @@ function zoomCamera(cameraName) {
     video.className = 'video-iframe object-contain';
     video.autoplay = true;
     video.playsInline = true;
-    video.muted = true;
+    video.muted = zoomMuted;
     zoomContainer.insertBefore(video, document.getElementById('zoom-canvas'));
-    
+
     startWebRTC(cam.go2rtcStreamName, 'zoom-player');
+
+    updateZoomMuteButton();
+    zoomMuteBtn.classList.remove('hidden');
+    zoomMuteBtn.classList.add('flex');
   } else {
     const port = appSettings.go2rtcPort || '5000';
     const mjpegUrl = getMjpegUrl(go2rtcIP, port, cam);
@@ -628,6 +654,10 @@ function zoomCamera(cameraName) {
     img.src = mjpegUrl;
     img.setAttribute('onerror', `mjpegError(this, '${cameraName}')`);
     zoomContainer.insertBefore(img, document.getElementById('zoom-canvas'));
+
+    // MJPEG has no audio channel at all — nothing to toggle.
+    zoomMuteBtn.classList.add('hidden');
+    zoomMuteBtn.classList.remove('flex');
   }
 
   // Draw overlay on zoom-canvas immediately

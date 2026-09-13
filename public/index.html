@@ -590,9 +590,15 @@
           <span class="h-2.5 w-2.5 rounded-full bg-indigo-500 animate-pulse"></span>
           <h3 id="zoom-title" class="text-base font-bold text-slate-100 capitalize">Camera Feed Zoom</h3>
         </div>
-        <button id="close-zoom-btn" class="text-slate-400 hover:text-slate-200 text-xl transition bg-slate-800/80 hover:bg-slate-800 h-9 w-9 rounded-full flex items-center justify-center">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
+        <div class="flex items-center gap-2">
+          <button id="zoom-mute-btn" class="hidden text-slate-400 hover:text-slate-200 text-xs font-bold uppercase tracking-wider transition bg-slate-800/80 hover:bg-slate-800 h-9 px-3.5 rounded-full items-center gap-2" title="Toggle Audio">
+            <i class="fa-solid fa-volume-xmark"></i>
+            <span>Muted</span>
+          </button>
+          <button id="close-zoom-btn" class="text-slate-400 hover:text-slate-200 text-xl transition bg-slate-800/80 hover:bg-slate-800 h-9 w-9 rounded-full flex items-center justify-center">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
       </div>
 
       <!-- Modal Body (Large Stream Container) -->
