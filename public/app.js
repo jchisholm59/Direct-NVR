@@ -1158,6 +1158,19 @@ settingsForm.addEventListener('submit', (e) => {
 });
 
 // UI Event bindings
+// Colour theme toggle ('starlink' default, 'classic' is the original indigo/slate look)
+const themeToggleBtn = document.getElementById('theme-toggle-btn');
+const themeToggleLabel = document.getElementById('theme-toggle-label');
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  themeToggleLabel.textContent = theme === 'starlink' ? 'Starlink' : 'Classic';
+  try { localStorage.setItem('direct-nvr-theme', theme); } catch (e) {}
+}
+applyTheme(document.documentElement.getAttribute('data-theme') === 'classic' ? 'classic' : 'starlink');
+themeToggleBtn.addEventListener('click', () => {
+  applyTheme(document.documentElement.getAttribute('data-theme') === 'starlink' ? 'classic' : 'starlink');
+});
+
 openSettingsBtn.addEventListener('click', () => {
   populateSettingsForm();
   settingsModal.classList.remove('hidden');

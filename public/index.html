@@ -6,15 +6,120 @@
   <title>Direct NVR Live Dashboard & Alert Engine</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Colour theme: 'starlink' (default, matches Starlink Monitor) or 'classic'.
+    // Applied before first paint to avoid a flash of the wrong palette.
+    (function () {
+      var theme = 'starlink';
+      try { theme = localStorage.getItem('direct-nvr-theme') || 'starlink'; } catch (e) {}
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+
+    // Route the palettes the UI uses through CSS variables so a theme can
+    // re-skin them. Fallbacks are Tailwind's stock values (the classic theme).
+    (function () {
+      var stock = {
+        slate:   { 50: '248 250 252', 100: '241 245 249', 200: '226 232 240', 300: '203 213 225', 400: '148 163 184', 500: '100 116 139', 600: '71 85 105', 700: '51 65 85', 800: '30 41 59', 900: '15 23 42', 950: '2 6 23' },
+        indigo:  { 50: '238 242 255', 100: '224 231 255', 200: '199 210 254', 300: '165 180 252', 400: '129 140 248', 500: '99 102 241', 600: '79 70 229', 700: '67 56 202', 800: '55 48 163', 900: '49 46 129', 950: '30 27 75' },
+        emerald: { 50: '236 253 245', 100: '209 250 229', 200: '167 243 208', 300: '110 231 183', 400: '52 211 153', 500: '16 185 129', 600: '5 150 105', 700: '4 120 87', 800: '6 95 70', 900: '6 78 59', 950: '2 44 34' },
+        rose:    { 50: '255 241 242', 100: '255 228 230', 200: '254 205 211', 300: '253 164 175', 400: '251 113 133', 500: '244 63 94', 600: '225 29 72', 700: '190 18 60', 800: '159 18 57', 900: '136 19 55', 950: '76 5 25' },
+        amber:   { 50: '255 251 235', 100: '254 243 199', 200: '253 230 138', 300: '252 211 77', 400: '251 191 36', 500: '245 158 11', 600: '217 119 6', 700: '180 83 9', 800: '146 64 14', 900: '120 53 15', 950: '69 26 3' }
+      };
+      var colors = {};
+      Object.keys(stock).forEach(function (name) {
+        colors[name] = {};
+        Object.keys(stock[name]).forEach(function (shade) {
+          colors[name][shade] = 'rgb(var(--' + name + '-' + shade + ', ' + stock[name][shade] + ') / <alpha-value>)';
+        });
+      });
+      tailwind.config = { theme: { extend: { colors: colors } } };
+    })();
+  </script>
   <!-- Socket.io Client (bundled locally for mobile) -->
   <script src="socket.io.min.js"></script>
   <!-- FontAwesome for icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     /* Dark glassmorphism styles */
+    :root {
+      --page-bg: #0f172a;
+      --page-text: #f8fafc;
+      --line: #1e293b;
+      --accent-rgb: 99, 102, 241;
+      --tag-person-rgb: 244, 63, 94;
+      --tag-person-text: #fb7185;
+      --tag-car-rgb: 59, 130, 246;
+      --tag-car-text: #60a5fa;
+      --tag-cat-rgb: 245, 158, 11;
+      --tag-cat-text: #fbbf24;
+    }
+
+    /* Starlink theme (matches starlink-monitor): graphite panels, sky-blue accent */
+    html[data-theme="starlink"] {
+      --page-bg: #0f1216;
+      --page-text: #e6e9ee;
+      --line: #2a303a;
+      --accent-rgb: 78, 161, 255;
+      --tag-person-rgb: 229, 83, 75;
+      --tag-person-text: #ec7770;
+      --tag-car-rgb: 78, 161, 255;
+      --tag-car-text: #6fb3ff;
+      --tag-cat-rgb: 229, 169, 58;
+      --tag-cat-text: #e5a93a;
+      --accent-green: #3fb68b;
+      --accent-green-glow: #3fb68b33;
+      --panel-bg-elevated: #0b0d10;
+      --panel-border: #2a303a;
+      --text-primary: #e6e9ee;
+      --text-secondary: #8b93a1;
+      --text-muted: #737b89;
+
+      --slate-50: 242 244 246;
+      --slate-100: 230 233 238;  /* text */
+      --slate-200: 208 212 219;
+      --slate-300: 180 186 197;
+      --slate-400: 139 147 161;  /* muted */
+      --slate-500: 115 123 137;
+      --slate-600: 86 94 107;
+      --slate-700: 58 65 77;
+      --slate-800: 42 48 58;     /* border */
+      --slate-900: 23 27 33;     /* panel */
+      --slate-950: 15 18 22;     /* bg */
+
+      --indigo-200: 184 217 255;
+      --indigo-300: 148 198 255;
+      --indigo-400: 111 179 255;
+      --indigo-500: 78 161 255;  /* accent */
+      --indigo-600: 58 139 230;
+      --indigo-700: 47 120 204;
+      --indigo-800: 36 89 154;
+      --indigo-900: 26 58 99;
+      --indigo-950: 15 34 56;
+
+      --emerald-100: 213 242 231;
+      --emerald-300: 111 203 168;
+      --emerald-400: 63 182 139; /* good */
+      --emerald-500: 52 160 122;
+      --emerald-600: 43 133 102;
+      --emerald-700: 35 107 82;
+      --emerald-800: 27 82 63;
+
+      --rose-200: 246 197 194;
+      --rose-300: 240 154 149;
+      --rose-400: 236 119 112;
+      --rose-500: 229 83 75;     /* bad */
+      --rose-600: 204 66 57;
+      --rose-800: 138 45 39;
+      --rose-900: 94 31 27;
+      --rose-950: 46 18 16;
+
+      --amber-400: 229 169 58;   /* warn */
+      --amber-500: 212 151 42;
+    }
+
     body {
-      background-color: #0f172a;
-      color: #f8fafc;
+      background-color: var(--page-bg);
+      color: var(--page-text);
     }
     .video-container {
       position: relative;
@@ -43,14 +148,14 @@
     }
     .camera-card:hover {
       transform: translateY(-4px);
-      border-color: #6366f1 !important;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 15px rgba(99, 102, 241, 0.15);
+      border-color: rgb(var(--accent-rgb)) !important;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 15px rgba(var(--accent-rgb), 0.15);
     }
     .camera-card:hover .video-iframe {
       transform: scale(1.02);
     }
 
-    :root {
+    :root:not([data-theme="starlink"]) {
       --accent-green: #4ade80;
       --accent-green-glow: #4ade8033;
       --panel-bg-elevated: #090d16;
@@ -58,6 +163,9 @@
       --text-primary: #f1f5f9;
       --text-secondary: #94a3b8;
       --text-muted: #64748b;
+    }
+
+    :root {
       --transition-smooth: all .25s cubic-bezier(.4, 0, .2, 1);
     }
 
@@ -66,8 +174,8 @@
       display: flex;
       gap: 12px;
       padding: 10px;
-      background-color: rgba(15, 23, 42, 0.4);
-      border: 1px solid #1e293b;
+      background-color: rgb(var(--slate-900, 15 23 42) / 0.4);
+      border: 1px solid var(--line);
       border-radius: 12px;
       cursor: pointer;
       transition: var(--transition-smooth);
@@ -89,8 +197,8 @@
 
     .event-card:hover {
       transform: translateX(2px);
-      border-color: rgba(99, 102, 241, 0.4);
-      background-color: rgba(30, 41, 59, 0.5);
+      border-color: rgba(var(--accent-rgb), 0.4);
+      background-color: rgb(var(--slate-800, 30 41 59) / 0.5);
     }
 
     .event-card:hover::before {
@@ -110,7 +218,7 @@
       background-color: #000;
       position: relative;
       flex-shrink: 0;
-      border: 1px solid #1e293b;
+      border: 1px solid var(--line);
     }
 
     .event-thumb {
@@ -130,7 +238,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background-color: #090d16;
+      background-color: var(--panel-bg-elevated);
       font-size: 1.1rem;
     }
 
@@ -141,7 +249,7 @@
       align-items: center;
       text-align: center;
       min-width: 58px;
-      border-right: 1px solid #1e293b;
+      border-right: 1px solid var(--line);
       padding-right: 10px;
       gap: 2px;
       flex-shrink: 0;
@@ -158,7 +266,7 @@
     .event-time-clock {
       font-size: 0.65rem;
       font-weight: 700;
-      color: #f1f5f9;
+      color: var(--text-primary);
     }
 
     .event-details {
@@ -179,7 +287,7 @@
     .event-camera-name {
       font-size: 0.7rem;
       font-weight: 700;
-      color: #94a3b8;
+      color: var(--text-secondary);
       text-transform: capitalize;
       white-space: nowrap;
       overflow: hidden;
@@ -196,27 +304,27 @@
     }
 
     .event-tag.person {
-      background-color: rgba(244, 63, 94, 0.15);
-      color: #fb7185;
-      border: 1px solid rgba(244, 63, 94, 0.2);
+      background-color: rgba(var(--tag-person-rgb), 0.15);
+      color: var(--tag-person-text);
+      border: 1px solid rgba(var(--tag-person-rgb), 0.2);
     }
 
     .event-tag.car {
-      background-color: rgba(59, 130, 246, 0.15);
-      color: #60a5fa;
-      border: 1px solid rgba(59, 130, 246, 0.2);
+      background-color: rgba(var(--tag-car-rgb), 0.15);
+      color: var(--tag-car-text);
+      border: 1px solid rgba(var(--tag-car-rgb), 0.2);
     }
 
     .event-tag.cat {
-      background-color: rgba(245, 158, 11, 0.15);
-      color: #fbbf24;
-      border: 1px solid rgba(245, 158, 11, 0.2);
+      background-color: rgba(var(--tag-cat-rgb), 0.15);
+      color: var(--tag-cat-text);
+      border: 1px solid rgba(var(--tag-cat-rgb), 0.2);
     }
 
     .event-tag.default {
-      background-color: rgba(148, 163, 184, 0.15);
-      color: #cbd5e1;
-      border: 1px solid rgba(148, 163, 184, 0.2);
+      background-color: rgb(var(--slate-400, 148 163 184) / 0.15);
+      color: rgb(var(--slate-300, 203 213 225));
+      border: 1px solid rgb(var(--slate-400, 148 163 184) / 0.2);
     }
 
     /* Filter Chips */
@@ -227,22 +335,22 @@
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      background-color: rgba(30, 41, 59, 0.5);
-      border: 1px solid #1e293b;
-      color: #64748b;
+      background-color: rgb(var(--slate-800, 30 41 59) / 0.5);
+      border: 1px solid var(--line);
+      color: var(--text-muted);
       transition: all 0.2s ease;
       white-space: nowrap;
     }
 
     .filter-chip:hover {
-      background-color: rgba(51, 65, 85, 0.5);
-      color: #94a3b8;
+      background-color: rgb(var(--slate-700, 51 65 85) / 0.5);
+      color: var(--text-secondary);
     }
 
     .filter-chip.active {
-      background-color: rgba(99, 102, 241, 0.15);
-      border-color: rgba(99, 102, 241, 0.4);
-      color: #818cf8;
+      background-color: rgba(var(--accent-rgb), 0.15);
+      border-color: rgba(var(--accent-rgb), 0.4);
+      color: rgb(var(--indigo-400, 129 140 248));
     }
 
     .no-scrollbar::-webkit-scrollbar {
@@ -277,6 +385,9 @@
           <option value="default" class="bg-slate-900">Loading Server...</option>
         </select>
       </div>
+      <button id="theme-toggle-btn" title="Switch colour theme" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-2 rounded-lg flex items-center gap-2 transition duration-200 shadow-sm">
+        <i class="fa-solid fa-palette text-indigo-400"></i> <span id="theme-toggle-label">Starlink</span>
+      </button>
       <button id="open-settings-btn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-4 py-2 rounded-lg flex items-center gap-2 transition duration-200 shadow-sm">
         <i class="fa-solid fa-sliders"></i> Settings & SMTP
       </button>
